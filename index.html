@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Starbies</title>
+<style>
+:root{--lime:#e4f55a;--teal:#8ac9d4;--mint:#a8e6b0;--pink:#ff2bf0;--bad:#c23bff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:"Arial Black","Trebuchet MS",sans-serif;color:#fff;user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+.screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center;padding:20px}
+.screen.on{display:flex}
+#start{background:linear-gradient(#000 65%,#1b3a40 88%,#7fb5bd)}
+#bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;display:none}
+#logo,#logo3{width:min(62vw,640px);animation:zoom 2.4s ease-in-out infinite}
+@keyframes zoom{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.play{width:min(52vw,250px);cursor:pointer;transition:transform .15s,filter .15s}
+.play:hover{transform:scale(1.1);filter:brightness(1.2)}
+.play:active{transform:scale(.95)}
+.panel{background:rgba(5,10,20,.88);border:4px solid var(--teal);border-radius:28px;padding:26px 34px;max-width:620px}
+h1{margin:0 0 10px;font-size:clamp(28px,5vw,48px);color:var(--lime);text-shadow:3px 3px 0 #1d5560}
+.tut{text-align:left;line-height:1.9;font-size:clamp(14px,2vw,18px);font-family:"Trebuchet MS",sans-serif;font-weight:bold}
+.tut b{color:var(--lime);font-family:"Arial Black",sans-serif}
+#over h1{color:var(--bad);text-shadow:3px 3px 0 #2a0b3a}
+#over,#win{background:rgba(0,0,0,.72)}
+.btn{background:var(--lime);color:#173;border:0;border-radius:40px;padding:14px 36px;font:inherit;font-size:22px;cursor:pointer;box-shadow:0 6px 0 #8a9a1c;transition:transform .1s}
+.btn:hover{transform:translateY(-2px)}.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #8a9a1c}
+#warn{position:fixed;left:10px;bottom:10px;max-width:420px;font:12px monospace;color:#ffb3b3;z-index:9}
+#hud{position:fixed;inset:0;pointer-events:none;display:none}
+#hud.on{display:block}
+.box{position:absolute;top:16px;background:rgba(5,10,20,.7);border:3px solid var(--teal);border-radius:18px;padding:12px 16px}
+#hl{left:16px;width:min(46vw,320px)}#hr{right:16px;text-align:right;font-size:clamp(14px,2vw,20px)}
+.lab{font-size:12px;margin:6px 0 3px;display:flex;justify-content:space-between}
+.bar{height:16px;border-radius:10px;background:#0008;border:2px solid #fff6;overflow:hidden}
+.fill{height:100%;width:0;border-radius:8px}
+#fc{background:linear-gradient(90deg,#b34cff,#ff2b6e)}#fe{background:linear-gradient(90deg,#2bf6ff,#a8e6b0)}#fu{background:linear-gradient(90deg,#ff2bf0,#e4f55a)}
+#hr b{color:var(--lime);font-size:1.4em}
+#ret{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border:3px solid var(--lime);border-radius:50%;display:none;pointer-events:none;box-shadow:0 0 10px var(--lime)}
+#ret::after{content:"";position:absolute;inset:11px;background:var(--lime);border-radius:50%}
+#boss{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:min(72vw,540px);display:none;background:rgba(25,5,30,.82);border:3px solid #ff4de0;border-radius:18px;padding:10px 16px}
+#boss .bar{height:22px}#fb{background:linear-gradient(90deg,#ff2b6e,#ff4de0)}
+#banner{position:fixed;top:20%;left:0;right:0;text-align:center;font-size:clamp(26px,6vw,60px);color:#ff4de0;text-shadow:3px 3px 0 #2a0b3a,0 0 20px #ff4de0;display:none;pointer-events:none;z-index:5}
+#sel{background:linear-gradient(#000 65%,#1b3a40 88%,#7fb5bd)}
+#bg2,#bg3{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1;display:none}
+#grid{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;max-width:1100px}
+.card{width:min(30vw,320px);min-width:220px;background:rgba(5,10,20,.85);border:4px solid var(--teal);border-radius:22px;padding:10px;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s}
+.card:hover{transform:translateY(-6px) scale(1.04);border-color:var(--lime);box-shadow:0 0 24px #e4f55a88}
+.card canvas{width:100%;border-radius:14px;display:block;background:#000}
+.cn{color:var(--lime);font-size:14px;margin-top:8px}.cm{font-size:clamp(16px,2vw,22px);margin-top:2px}
+.btn.sm{font-size:16px;padding:10px 24px;background:var(--teal);box-shadow:0 5px 0 #4a8a96}
+#sel{justify-content:space-between;padding:9vh 20px 24vh}   /* logo más abajo, niveles más arriba */
+#logo2{width:min(36vw,340px);animation:none}
+#selBottom{display:flex;flex-direction:column;align-items:center;gap:14px}
+#selBottom h1{margin:0}
+#lvbtns{display:flex;gap:22px}
+.lvbtn{width:clamp(64px,11vw,96px);height:clamp(64px,11vw,96px);border:0;border-radius:24px;background:var(--lime);color:#173;font:inherit;font-size:clamp(28px,5vw,44px);cursor:pointer;box-shadow:0 7px 0 #8a9a1c;transition:transform .12s,filter .12s}
+.lvbtn:hover{transform:translateY(-4px) scale(1.08);filter:brightness(1.1)}
+.lvbtn:active{transform:translateY(4px);box-shadow:0 2px 0 #8a9a1c}
+#selBack{position:absolute;top:16px;left:16px}
+#end{background:linear-gradient(#000 65%,#1b3a40 88%,#7fb5bd);gap:18px}
+#logo3{width:min(48vw,480px)}
+#end .panel{background:none;border:none;max-width:760px;text-shadow:0 0 18px #8ac9d4}
+#end h1{font-size:clamp(30px,5.5vw,56px);margin:0 0 12px}
+#end p{margin:8px 0;font-family:"Trebuchet MS",sans-serif;font-weight:bold;font-size:clamp(16px,2.4vw,24px);line-height:1.5}
+#end .sc{color:var(--lime);font-family:"Arial Black",sans-serif}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="warn"></div>
+
+<div id="start" class="screen on">
+  <img id="bg" alt="">
+  <img id="logo" alt="Starbies">
+  <img id="play" class="play" alt="PLAY" style="opacity:.4">
+  <div id="loading">Cargando modelos…</div>
+</div>
+
+<div id="sel" class="screen">
+  <img id="bg2" alt="">
+  <img id="logo2" alt="Starbies">
+  <div id="selBottom">
+    <h1>Niveles</h1>
+    <div id="lvbtns">
+      <button class="lvbtn" data-i="0">1</button>
+      <button class="lvbtn" data-i="1">2</button>
+      <button class="lvbtn" data-i="2">3</button>
+    </div>
+  </div>
+  <button class="btn sm" id="selBack">← Inicio</button>
+</div>
+
+<div id="tut" class="screen">
+  <div class="panel">
+    <h1 id="tt">Nivel 1</h1>
+    <div class="tut" id="tcon">
+      <b>W A S D</b> mover (relativo a la cámara)<br>
+      <b>Clic derecho + arrastrar</b> (o <b>Q / E</b>) girar la cámara<br>
+      <b>Mouse</b> apuntar · <b>Clic izquierdo</b> disparar (gasta Esencia Pura)<br>
+      <b>Mantén clic 1 s</b> y suelta: ¡ULTI en área!<br>
+      <b>Shift</b> dash · <b>Espacio</b> saltar<br>
+      Purifica a todos los Stargords antes de que la corrupción llegue al 100 %. Evita los <b>charcos</b> y recoge las <b>gemas</b>.
+    </div>
+  </div>
+  <img id="go" class="play" alt="PLAY">
+  <button class="btn sm" id="tutBack">← Niveles</button>
+</div>
+
+<div id="end" class="screen">
+  <img id="bg3" alt="">
+  <img id="logo3" alt="Starbies">
+  <div class="panel">
+    <h1>¡Lo lograste!</h1>
+    <p>Gracias a ti, el universo quedó libre de los Stargors.<br>Las estrellas vuelven a brillar en paz.</p>
+    <p class="sc">Score final: <span id="es">0</span></p>
+  </div>
+  <button class="btn" id="rg">Reiniciar juego</button>
+</div>
+
+<div id="hud">
+  <div class="box" id="hl">
+    <div class="lab"><span>CORRUPCIÓN</span><span id="tc">0%</span></div><div class="bar"><div class="fill" id="fc"></div></div>
+    <div class="lab"><span>ESENCIA PURA</span><span id="te">100</span></div><div class="bar"><div class="fill" id="fe"></div></div>
+    <div class="lab"><span>ULTI</span><span id="tu">LISTA</span></div><div class="bar"><div class="fill" id="fu"></div></div>
+  </div>
+  <div id="boss"><div class="lab"><span>STARGOR REY</span><span id="tb"></span></div><div class="bar"><div class="fill" id="fb" style="width:100%"></div></div></div>
+  <div class="box" id="hr">Score <b id="sc">0</b><br>Stargords restantes <b id="rm">10</b></div>
+</div>
+<div id="banner"></div>
+<div id="ret"></div>
+
+<div id="over" class="screen"><div class="panel"><h1>GAME OVER</h1><p>La corrupción llegó al 100%.</p><p>Score: <span id="os">0</span></p></div><button class="btn" id="r1">Reiniciar</button><button class="btn sm" id="m1">Elegir nivel</button></div>
+<div id="win" class="screen"><div class="panel"><h1 id="wh">¡NIVEL COMPLETADO!</h1><p id="wt">La Gran Ciudad quedó purificada.</p><p>Score: <span id="ws">0</span></p></div><button class="btn" id="r2">Siguiente nivel ▶</button><button class="btn sm" id="m2">Elegir nivel</button></div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {clone} from 'three/addons/utils/SkeletonUtils.js';
+
+/* ================= CONFIGURACIÓN (ajusta aquí) ================= */
+const FILES = {   // basta el nombre base: el juego prueba solo con espacios o guiones bajos y en las subcarpetas (STARBIE/, STARGORS/, GÁRFICO/...)
+  starbie:'Starbie GLB .glb', stargord:'Stargoar GLB.glb', city:'La gran ciudad GLB.glb',
+  gem:'Gema  GLB.glb', puddle:'Charco GLB.glb', pipes:'TuberiasYCharcosaGLB.glb', cave:'NidoStargor.glb'   // pipes = Nivel 2
+};
+const CFG = {
+  modelYaw: -Math.PI/2,              // tus GLB miran hacia +X; esto los gira al frente (si salen de lado/espaldas prueba 0, Math.PI/2, Math.PI)
+  antennas: [[-0.23,1.0,0.19],[0.23,1.0,0.19]], // puntas de las antenas (x,y,z) en metros, medidas de tu GLB
+  cityLift: 0,                       // ajuste manual de altura del mapa (sube/baja el suelo) si hace falta
+  arena: 8, goal: 10, maxAlive: 4,
+  walk: 6, shotDmg: 50, ultDmg: 600, bossHp: 2000, jump: 8.4, gravity: 22, dash: 16, dashTime: .18, dashCd: .8,
+  shotCost: 8, essenceRegen: 7, ultCd: 5, ultHold: 1,
+  chase: 2.6, contactCorr: 9, puddleCorr: 6, puddleSlow: .45,
+  gemTime: 6, gemHeal: 25
+};
+/* =============================================================== */
+
+const $ = id => document.getElementById(id);
+const FOLDERS=['','STARBIE/','STARGORS/','STARGORDS/','GÁRFICO/','GRÁFICO/','GRAFICO/','FONTS/'];
+function candidates(names){ // todas las rutas posibles de un archivo: raíz o subcarpetas, con espacios o guiones bajos
+  const out=[];
+  for(const n of [].concat(names))
+    for(const v of [n,n.replace(/ /g,'_'),n.replace(/_/g,' '),n.replace(/[ _]+/g,' '),n.replace(/[ _]+/g,'_'),n.replace(/[ _]+\./,'.')])
+      for(const f of FOLDERS) out.push(f+v);
+  return [...new Set(out)];
+}
+function pickImg(names,cb){ // carga la primera imagen que exista
+  const c=candidates(names); let i=0;
+  const next=()=>{ if(i>=c.length){$('warn').textContent+='⚠ No se encontró '+[].concat(names)[0]+'. ';return}
+    const im=new Image(); im.onload=()=>cb(im.src); im.onerror=()=>{i++;next()}; im.src=encodeURI(c[i]); }; next();
+}
+pickImg('LOGO STARBIE.png',u=>{$('logo').src=u;$('logo2').src=u;$('logo3').src=u});
+pickImg('Boton PLAY.png',u=>{$('play').src=u;$('go').src=u});
+pickImg('GÁRFICO/PantallaFondo.png',u=>{$('bg').src=u;$('bg').style.display='block';$('bg2').src=u;$('bg2').style.display='block';$('bg3').src=u;$('bg3').style.display='block'});
+const rnd = (a,b)=>a+Math.random()*(b-a);
+const renderer = new THREE.WebGLRenderer({canvas:$('c'),antialias:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a1f5c); scene.fog = new THREE.Fog(0x2a1f5c,18,45);
+function makeSky(stops){ // degradado vertical para el cielo
+  const c=document.createElement('canvas');c.width=2;c.height=256;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,0,256);
+  stops.forEach(([p,col])=>g.addColorStop(p,col)); x.fillStyle=g; x.fillRect(0,0,2,256);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+const sky=new THREE.Mesh(new THREE.SphereGeometry(90,24,16),new THREE.MeshBasicMaterial({side:THREE.BackSide,fog:false,depthWrite:false,toneMapped:false}));
+sky.renderOrder=-10; scene.add(sky);
+const cam = new THREE.PerspectiveCamera(60,1,.1,100);
+const hemi=new THREE.HemisphereLight(0xffffff,0x6a5acd,1.6); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff,1.6); sun.position.set(6,12,4); scene.add(sun);
+function resize(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
+addEventListener('resize',resize); resize();
+
+/* ---------- Carga de modelos (con respaldo si falta alguno) ---------- */
+const loader = new GLTFLoader(), models = {}, warn = [];
+const fallbacks = {
+  starbie:()=>new THREE.Mesh(new THREE.OctahedronGeometry(.5),new THREE.MeshLambertMaterial({color:0x8ac9d4})),
+  stargord:()=>new THREE.Mesh(new THREE.OctahedronGeometry(.5),new THREE.MeshLambertMaterial({color:0xb34cff})),
+  gem:()=>new THREE.Mesh(new THREE.OctahedronGeometry(.4),new THREE.MeshLambertMaterial({color:0x2bf6ff})),
+  puddle:()=>new THREE.Mesh(new THREE.CylinderGeometry(1,1,.05,20),new THREE.MeshLambertMaterial({color:0x5a1d8a})),
+  pipes:()=>fallbacks.city(), cave:()=>fallbacks.city(),
+  city:()=>{const g=new THREE.Group();g.add(new THREE.Mesh(new THREE.BoxGeometry(20,.2,20),new THREE.MeshLambertMaterial({color:0x555566})));
+    for(let i=0;i<6;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(3,rnd(3,7),3),new THREE.MeshLambertMaterial({color:0xe4a0ff}));b.position.set(rnd(-8,8),2.5,i%2?-8.5:8.5);g.add(b)}return g}
+};
+const loadFirst=async names=>{ for(const u of candidates(names)){ try{return await loader.loadAsync(encodeURI(u))}catch(e){} } return null };
+await Promise.all(Object.entries(FILES).map(async([k,f])=>{ const g=await loadFirst(f); if(g)models[k]=g.scene; else warn.push([].concat(f)[0]) }));
+if(warn.length) $('warn').textContent='⚠ No se pudieron cargar: '+warn.join(', ')+' (usando formas de respaldo). Revisa nombres/ruta y abre con un servidor local.';
+
+/* Escala el modelo a "size" metros (eje y, o ancho máximo xz) y apoya su base en y=0 */
+function make(key,size,axis='y'){
+  const o = models[key]?clone(models[key]):fallbacks[key]();
+  let b=new THREE.Box3().setFromObject(o),s=b.getSize(new THREE.Vector3());
+  o.scale.multiplyScalar(size/((axis==='y'?s.y:Math.max(s.x,s.z))||1));
+  b.setFromObject(o); const c=b.getCenter(new THREE.Vector3()); o.position.set(-c.x,-b.min.y,-c.z);
+  const w=new THREE.Group(); w.add(o); w.rotation.y=(key==='city'||key==='puddle'||key==='gem')?0:CFG.modelYaw;
+  if(key==='puddle')o.traverse(m=>{ if(m.isMesh)[].concat(m.material).forEach(t=>{t.polygonOffset=true;t.polygonOffsetFactor=-4;t.polygonOffsetUnits=-4}) }); // evita que el pavimento tape el charco
+  const bd=new THREE.Group(); bd.add(w);
+  const g=new THREE.Group(); g.add(bd); g.userData.b=bd;
+  if(key==='starbie'||key==='stargord') rig(g);
+  return g;
+}
+
+/* ---------- Animación de correr (tus GLB no traen huesos ni clips, así que es procedural) ---------- */
+const HIP=-4.3; // altura de la cadera en unidades originales del modelo
+function rig(g){
+  const r={ph:0,amp:0,legs:[],dirty:false}; g.userData.rig=r;
+  g.traverse(m=>{
+    if(!m.isMesh)return;
+    m.geometry=m.geometry.clone(); m.geometry.computeBoundingBox();
+    const bb=m.geometry.boundingBox; if(bb.max.y-bb.min.y<5)return;   // solo el cuerpo
+    const p=m.geometry.attributes.position, o=new Float32Array(p.array), idx=[], w=[], sd=[];
+    for(let i=0;i<p.count;i++){const y=o[i*3+1]; if(y<HIP){idx.push(i);w.push(Math.min(1,HIP-y));sd.push(Math.tanh(o[i*3+2]/.4))}}
+    r.legs.push({p,o,idx,w,sd});
+  });
+}
+function animate(g,dt,v){
+  const r=g.userData.rig,b=g.userData.b; if(!r)return;
+  const mv=v>.05; r.amp+=((mv?1:0)-r.amp)*Math.min(1,dt*12); if(mv)r.ph+=dt*(8+6*Math.min(v,2));
+  const s=Math.sin(r.ph),A=r.amp;
+  b.rotation.x=(.2+.1*Math.max(0,v-1))*A;            // inclinación hacia adelante
+  b.rotation.z=s*.1*A;                                // balanceo de lado a lado
+  b.position.y=Math.abs(Math.cos(r.ph))*.1*A;         // rebote de cada zancada
+  b.scale.y=1+.05*Math.abs(Math.sin(r.ph))*A+.02*Math.sin(performance.now()/300)*(1-A);
+  if(A>.01||r.dirty){                                 // piernas alternadas
+    const sw=s*.75*A;
+    for(const L of r.legs){const a=L.p.array;
+      for(let k=0;k<L.idx.length;k++){const i=L.idx[k]*3,ang=sw*L.sd[k]*L.w[k],c=Math.cos(ang),n=Math.sin(ang),x=L.o[i],dy=L.o[i+1]-HIP;
+        a[i]=x*c-dy*n; a[i+1]=dy*c+x*n+HIP;}
+      L.p.needsUpdate=true;}
+    r.dirty=A>.01;
+  }
+}
+
+/* ---------- Escenario y objetos ---------- */
+const city=make('city',20,'xz'); scene.add(city); city.updateMatrixWorld(true);
+{ // Detecta la altura real del pavimento (tapa del cubo) y lo baja a y=0
+  const rc=new THREE.Raycaster(), hits=[];
+  for(let x=-9;x<=9;x+=2)for(let z=-9;z<=9;z+=2){
+    rc.set(new THREE.Vector3(x,100,z),new THREE.Vector3(0,-1,0));
+    const h=rc.intersectObject(city,true)[0]; if(h)hits.push(h.point.y);
+  }
+  if(hits.length){hits.sort((a,b)=>a-b);city.position.y=-hits[Math.floor(hits.length*.15)]}
+  city.position.y+=CFG.cityLift;
+}
+const player = {g:make('starbie',1), vel:new THREE.Vector3(), dash:0, dashCd:0, ai:0, air:false, vy:0, h:0};
+scene.add(player.g);
+const gem = {g:make('gem',.7), t:0, wait:2}; gem.g.visible=false; scene.add(gem.g);
+const puddles = [];
+for(let i=0;i<5;i++){const g=make('puddle',2.6,'xz');g.position.set(rnd(-8,8),.02,rnd(-8,8));scene.add(g);puddles.push(g)}
+const charge = new THREE.Mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshBasicMaterial({color:0xff2bf0,transparent:true,opacity:.8}));
+charge.visible=false; scene.add(charge);
+
+/* ---------- Estado ---------- */
+let state='menu', corr=0, ess=100, score=0, purified=0, spawned=0, spawnT=1, moveT=12, ultCd=0, hold=0, holding=false;
+let camYaw=0, camPitch=.5, enemies=[], shots=[], friends=[];
+let ground=()=>0, solid=()=>false, inPit=()=>false, pitComps=[];
+let boss=null, bossCalled=false, bossT=0, bossWin=0, fx=[];
+const keys={}, mouse={x:innerWidth/2,y:innerHeight/2}, ray=new THREE.Raycaster(), plane=new THREE.Plane(new THREE.Vector3(0,1,0),-1);
+const shotGeo=new THREE.SphereGeometry(1,12,10);
+// Cámara con colisión: solo los edificios bloquean (no el piso ni los árboles)
+const camBlockers=[], camRay=new THREE.Raycaster(); let camDist=7;
+city.traverse(m=>{ if(!m.isMesh)return; let n=m,skip=false;
+  while(n&&n!==city){ if(/piso|suelo|floor|arbol|tronco|copa/i.test(n.name))skip=true; n=n.parent }
+  if(!skip)camBlockers.push(m) });
+
+/* ---------- Nivel 2: Las Tuberías (tu GLB a escala real, sin techo) ---------- */
+const pipesG=new THREE.Group(); pipesG.add(models.pipes?clone(models.pipes):fallbacks.pipes()); scene.add(pipesG);
+pipesG.traverse(m=>{ let n=m,h=false; while(n){ if(/techo/i.test(n.name))h=true; n=n.parent } if(h)m.visible=false }); // oculta el techo para ver desde arriba
+const camWalls=[]; pipesG.updateMatrixWorld(true);
+pipesG.traverse(m=>{ if(!m.isMesh||!m.visible)return; const sz=new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3()), a=[sz.x,sz.y,sz.z].sort((p,q)=>p-q); if(a[1]>=1)camWalls.push(m) }); // todo lo "grueso"; los tubos finos no jalan la cámara
+const pillars=[]; pipesG.traverse(m=>{ if(!m.isMesh)return; let n=m; while(n){ if(/^cilindro/i.test(n.name)){pillars.push(m);break} n=n.parent } });
+
+/* Mapa de alturas del nivel: suelo de la plataforma, pozos (huecos) y obstáculos sólidos */
+function buildGrid(root,lim=8,step=.5,yLo=1.3,yHi=7){
+  root.updateMatrixWorld(true);
+  const meshes=[]; root.traverse(m=>{if(m.isMesh&&m.visible)meshes.push(m)});
+  const rc=new THREE.Raycaster(), dn=new THREE.Vector3(0,-1,0), n=Math.round(2*lim/step)+1, H=new Float32Array(n*n), T=new Float32Array(n*n);
+  for(let i=0;i<n;i++)for(let k=0;k<n;k++){
+    const x=-lim+i*step, z=-lim+k*step;
+    rc.set(new THREE.Vector3(x,yLo,z),dn); let h=rc.intersectObjects(meshes,false)[0]; H[i*n+k]=h?h.point.y:-99; // suelo a nivel de caminar
+    rc.set(new THREE.Vector3(x,yHi,z),dn);   h=rc.intersectObjects(meshes,false)[0]; T[i*n+k]=h?h.point.y:-99; // lo más alto (pilares, tubos)
+  }
+  const sorted=[...H].filter(v=>v>-50).sort((a,b)=>a-b), P=sorted[Math.floor(sorted.length/2)]||0; // altura de la plataforma
+  root.position.y=-P; root.updateMatrixWorld(true);                                              // plataforma = y 0
+  const cell=(x,z)=>{const i=Math.round((x+lim)/step),k=Math.round((z+lim)/step);return(i<0||k<0||i>=n||k>=n)?-1:i*n+k};
+  const ground=(x,z)=>{const c=cell(x,z);return c<0||H[c]<-50?0:THREE.MathUtils.clamp(H[c]-P,-1.5,.6)};
+  const solid=(x,z)=>{const c=cell(x,z);return c<0||H[c]<-50||T[c]-P>1.2};
+  const inPit=(x,z)=>{const c=cell(x,z);return c>=0&&H[c]>-50&&H[c]-P<-.4&&T[c]-P<-.4};
+  const seen=new Uint8Array(n*n), pitComps=[];
+  for(let c0=0;c0<n*n;c0++){
+    if(seen[c0])continue; seen[c0]=1;
+    if(!inPit(-lim+Math.floor(c0/n)*step,-lim+(c0%n)*step))continue;
+    const st=[c0],comp=[];
+    while(st.length){const c=st.pop(),i=Math.floor(c/n),k=c%n; comp.push([-lim+i*step,-lim+k*step]);
+      for(const [di,dk] of [[1,0],[-1,0],[0,1],[0,-1]]){const a=i+di,b=k+dk; if(a<0||b<0||a>=n||b>=n)continue; const c2=a*n+b; if(seen[c2])continue; seen[c2]=1; if(inPit(-lim+a*step,-lim+b*step))st.push(c2)}}
+    if(comp.length>4)pitComps.push(comp);
+  }
+  return {ground,solid,inPit,pitComps,walk:meshes};
+}
+
+/* ---------- Nivel 3: El Nido Stargor (cueva sin techo para poder ver desde arriba) ---------- */
+const caveG=new THREE.Group(); caveG.add(models.cave?clone(models.cave):fallbacks.cave()); scene.add(caveG); caveG.updateMatrixWorld(true);
+let caveMesh=null;
+caveG.traverse(m=>{
+  if(!m.isMesh)return;
+  const mat=m.material=[].concat(m.material)[0].clone(), c=new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()), far=Math.max(Math.abs(c.x),Math.abs(c.z));
+  if(/cristal/i.test(mat.name)){ mat.emissiveIntensity=1.8; if(c.y>8&&far<4.2)m.visible=false; return }  // cristales del techo fuera
+  if(mat.color)mat.color.setRGB(.12,.05,.2); mat.roughness=.9; mat.metalness=0;                          // roca más clara para que se vea
+  const g=m.geometry=m.geometry.clone(), pos=g.attributes.position, ix=g.index; if(!ix)return;
+  const keep=[]; for(let i=0;i<ix.count;i+=3){ const a=ix.getX(i),b=ix.getX(i+1),d=ix.getX(i+2);
+    const cy=(pos.getY(a)+pos.getY(b)+pos.getY(d))/3, cx=(pos.getX(a)+pos.getX(b)+pos.getX(d))/3, cz=(pos.getZ(a)+pos.getZ(b)+pos.getZ(d))/3;
+    if(cy>8.3&&Math.max(Math.abs(cx),Math.abs(cz))<4.6)continue; keep.push(a,b,d) }                       // quita techo y estalactitas interiores
+  g.setIndex(keep); g.computeBoundingSphere(); g.computeBoundingBox(); caveMesh=m;
+});
+
+const LEVELS=[
+  {name:'La Gran Ciudad', root:city, blockers:camBlockers, title:'¡Purifica la ciudad!', goal:10, arena:8, rand:5, bg:0x2a1f5c, start:[0,6], note:'', done:'La Gran Ciudad quedó purificada.',
+   light:{hemi:[0xcfe8ff,0xb59f7a,1.9], sun:[0xfff1d0,2.6,[10,24,8]], fog:[0xd8f0ff,35,80]},          // mediodía, cielo azul
+   sky:[[0,'#2a78ee'],[.35,'#74bfff'],[.5,'#d8f0ff'],[1,'#e8f7ff']]},
+  {name:'Las Tuberías', root:pipesG, blockers:camWalls, title:'¡Limpia las tuberías!', goal:25, arena:7, rand:3, maxAlive:5, bg:0x0f2c35, start:[0,1], done:'Las Tuberías quedaron purificadas.',
+   light:{hemi:[0x8a78b8,0x2b1c24,1.0], sun:[0xff8a3a,2.3,[-8,9,2]], fog:[0x3a2038,12,40]},          // atardecer
+   sky:[[0,'#0e0c26'],[.3,'#3a1d4c'],[.46,'#c0506a'],[.5,'#ff9a55'],[.56,'#4a2440'],[1,'#120a18']],
+   note:'Los <b>pozos con charco</b> del suelo ralentizan y suben la corrupción, ¡y de ellos también salen Stargords!',
+   ...buildGrid(pipesG)},
+  {name:'El Nido Stargor', root:caveG, blockers:caveMesh?[caveMesh]:[], title:'¡Destruye el nido!', goal:25, arena:4.3, rand:4, maxAlive:5, boss:true, puddleScale:.7, bg:0x120620, start:[0,1.5],
+   note:'Purifica a los 25 Stargords y aparecerá el <b>STARGOR REY</b>: ¡necesita <b>'+CFG.bossHp+'</b> de daño! Los charcos y las gemas siguen apareciendo.',
+   done:'El Nido Stargor quedó purificado.',
+   light:{hemi:[0xc9a4ff,0x4a2a70,2.4], sun:[0xe0c8ff,1.5,[2,14,4]], fog:[0x120620,10,40]},
+   sky:[[0,'#0a0412'],[.5,'#1a0a2a'],[1,'#07020c']],
+   ...buildGrid(caveG,5,.5,5.6,12)}
+];
+let lvl=0, L=LEVELS[0];
+
+function show(id){['start','sel','tut','over','win','end'].forEach(s=>$(s).classList.toggle('on',s===id));$('hud').classList.toggle('on',state==='play');$('ret').style.display=state==='play'?'block':'none';document.body.style.cursor=state==='play'?'none':'default'}
+function applyLight(){ // ambiente de cada nivel: luz, niebla y cielo
+  const T=L.light; hemi.color.setHex(T.hemi[0]); hemi.groundColor.setHex(T.hemi[1]); hemi.intensity=T.hemi[2];
+  sun.color.setHex(T.sun[0]); sun.intensity=T.sun[1]; sun.position.set(...T.sun[2]);
+  scene.fog.color.setHex(T.fog[0]); scene.fog.near=T.fog[1]; scene.fog.far=T.fog[2]; scene.background.setHex(T.fog[0]);
+  sky.material.map=L.skyTex||(L.skyTex=makeSky(L.sky)); sky.material.needsUpdate=true;
+}
+function applyLevel(){
+  L=LEVELS[lvl]; LEVELS.forEach((v,i)=>{v.root.visible=i===lvl; (v.extras||[]).forEach(g=>g.visible=i===lvl)});
+  applyLight();
+  ground=L.ground||(()=>0); solid=L.solid||(()=>false); inPit=L.inPit||(()=>false); pitComps=L.pitComps||[];
+  puddles.forEach((q,i)=>{q.visible=i<L.rand; q.scale.setScalar(L.puddleScale||1); const sp=randSpot(1); q.position.set(sp[0],puddleY(sp[0],sp[1]),sp[1])});
+  $('tt').textContent='Nivel '+(lvl+1)+' · '+L.name; $('tcon').style.display=lvl===0?'block':'none'; camDist=7;   // instrucciones solo en el nivel 1
+}
+function randSpot(m=.5){ // punto libre sobre la plataforma (no en pozos ni obstáculos)
+  for(let t=0;t<80;t++){const x=rnd(-L.arena+m,L.arena-m),z=rnd(-L.arena+m,L.arena-m); if(Math.abs(ground(x,z))<.1&&!solid(x,z))return[x,z]}
+  return [L.start[0],L.start[1]];
+}
+function puddleY(x,z){ // altura real del pavimento en ese punto (+ un poco para que no quede hundido)
+  if(!L.root||L.ground)return .05;
+  const rc=puddleY.rc||(puddleY.rc=new THREE.Raycaster()); rc.set(new THREE.Vector3(x,1.2,z),new THREE.Vector3(0,-1,0));
+  const h=rc.intersectObject(L.root,true)[0]; return (h&&h.point.y<.6?Math.max(0,h.point.y):0)+.06;
+}
+// ---- Cuerpo con física: sube escalones/tubos, cae a los pozos, choca con paredes y pilares ----
+const DN=new THREE.Vector3(0,-1,0), STEP=.45;
+function probe(x,z,y,list=L.walk){ // altura de la superficie más alta justo debajo de (y+STEP)
+  const r=probe.r||(probe.r=new THREE.Raycaster()); r.set(new THREE.Vector3(x,y+STEP,z),DN);
+  const h=r.intersectObjects(list,false)[0]; return h?h.point.y:-50;
+}
+function blockedAhead(x,y,z,dx,dz){ // ¿pared, tubo o pilar adelante (a altura de rodilla) o vacío?
+  const len=Math.hypot(dx,dz); if(len<1e-6)return false;
+  const r=blockedAhead.r||(blockedAhead.r=new THREE.Raycaster()); r.set(new THREE.Vector3(x,y+.3,z),new THREE.Vector3(dx/len,0,dz/len)); r.far=len+.4;
+  return r.intersectObjects(L.walk,false).length>0 || probe(x+dx,z+dz,y)<-40;
+}
+function moveBody(pos,st,dx,dz,dt,hop){
+  let hit=false;
+  if(L.walk){
+    if(dx&&blockedAhead(pos.x,pos.y,pos.z,dx,0))hit=true; else pos.x+=dx;
+    if(dz&&blockedAhead(pos.x,pos.y,pos.z,0,dz))hit=true; else pos.z+=dz;
+  }else{pos.x+=dx;pos.z+=dz}
+  const gh=L.walk?probe(pos.x,pos.z,pos.y):0;
+  if(st.air){st.vy-=CFG.gravity*dt;pos.y+=st.vy*dt;if(st.vy<=0&&pos.y<=gh){pos.y=gh;st.vy=0;st.air=false}}
+  else if(gh<pos.y-.06){st.air=true;st.vy=0}                     // se cae a un pozo o borde
+  else pos.y+=(gh-pos.y)*Math.min(1,dt*25);                       // sube escalones
+  if(hit&&hop&&!st.air&&!(st.hopCd>0)){st.air=true;st.vy=CFG.jump*.85;st.hopCd=.8} // los Stargords saltan para salir de los pozos
+  if(st.hopCd>0)st.hopCd-=dt;
+  st.h=Math.max(0,pos.y-gh);
+}
+const spawnY=(x,z)=>L.walk?probe(x,z,.45):0;
+
+// ---- Nivel 2: charcos visibles en los pozos (fondo morado + un charco ajustado a cada hueco) ----
+{
+  const P2=LEVELS[1]; let pmat=null; if(models.puddle)models.puddle.traverse(m=>{if(!pmat&&m.isMesh)pmat=[].concat(m.material)[0]});
+  const floorMat=pmat?pmat.clone():new THREE.MeshLambertMaterial({color:0x2a0b4a});
+  pipesG.traverse(m=>{ if(!m.isMesh)return; m.geometry.computeBoundingBox(); const bb=m.geometry.boundingBox;
+    if(bb.max.y-bb.min.y<.1&&/Material\.002/.test([].concat(m.material)[0]?.name||''))m.material=floorMat });   // el fondo plano de los pozos
+  P2.extras=[];
+  for(const comp of (P2.pitComps||[])){
+    let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9; comp.forEach(([x,z])=>{x0=Math.min(x0,x);x1=Math.max(x1,x);z0=Math.min(z0,z);z1=Math.max(z1,z)});
+    const w=x1-x0+.5,d=z1-z0+.5,cx=(x0+x1)/2,cz=(z0+z1)/2, g=make('puddle',1,'xz');
+    g.scale.set(w*.92,1,d*.92); g.position.set(cx,probe(cx,cz,.45,P2.walk)+.04,cz); g.visible=false; scene.add(g); P2.extras.push(g);
+  }
+  // Rayos de luz que entran por las ventanas de la fábrica (aditivos, siguen la dirección del sol del nivel)
+  const glow=(()=>{const c=document.createElement('canvas');c.width=64;c.height=128;const x=c.getContext('2d');
+    let g=x.createLinearGradient(0,0,64,0);g.addColorStop(0,'rgba(255,170,80,0)');g.addColorStop(.5,'rgba(255,195,115,1)');g.addColorStop(1,'rgba(255,170,80,0)');
+    x.fillStyle=g;x.fillRect(0,0,64,128);x.globalCompositeOperation='destination-in';
+    g=x.createLinearGradient(0,0,0,128);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(.5,'rgba(0,0,0,.85)');g.addColorStop(1,'rgba(0,0,0,0)');
+    x.fillStyle=g;x.fillRect(0,0,64,128);return new THREE.CanvasTexture(c)})();
+  const mat=op=>new THREE.MeshBasicMaterial({map:glow,color:0xffa050,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
+  const sd=new THREE.Vector3(...P2.light.sun[2]).normalize(), hx=-sd.x, hz=-sd.z, th=Math.atan2(-hx,-hz), shafts=new THREE.Group();
+  for(const [fx,fz] of [[-5,.8],[-1.5,.8],[2,.8],[5.5,.8]]){
+    const beam=new THREE.Group(); // dos planos cruzados = se ve desde cualquier ángulo
+    const a=new THREE.Mesh(new THREE.PlaneGeometry(1.8,8.5),mat(.5)), b=a.clone(); b.rotation.y=Math.PI/2; beam.add(a,b);
+    beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),sd); beam.position.set(fx,.04,fz).addScaledVector(sd,4.25); shafts.add(beam);
+    const pool=new THREE.Group(), pm=new THREE.Mesh(new THREE.PlaneGeometry(1.8,3.4),mat(.7)); pm.rotation.x=-Math.PI/2; pool.add(pm);
+    pool.rotation.y=th; pool.position.set(fx,.06,fz); shafts.add(pool); // mancha de luz en el piso
+  }
+  shafts.visible=false; scene.add(shafts); P2.extras.push(shafts);
+}
+{ // Nivel 3: luces de los cristales
+  const P3=LEVELS[2]; P3.extras=[];
+  for(const [x,z,col] of [[-2.8,1.6,0xff4de0],[2.8,-1.2,0x45e0ff],[2.4,3,0xff4de0],[-2.4,-3,0xb06bff]]){
+    const l=new THREE.PointLight(col,35,13,1.6); l.position.set(x,2.2,z); l.visible=false; scene.add(l); P3.extras.push(l);
+  }
+}
+function reset(){
+  applyLevel();
+  [...enemies,...friends].forEach(e=>scene.remove(e.g)); shots.forEach(s=>scene.remove(s.m));
+  enemies=[];shots=[];friends=[];corr=0;ess=100;score=0;purified=0;spawned=0;spawnT=1;ultCd=0;hold=0;holding=false;
+  camYaw=0; player.g.position.set(L.start[0],0,L.start[1]);player.vel.set(0,0,0);player.vy=0;player.air=false;player.h=0;
+  if(boss){scene.remove(boss.g);boss=null} bossCalled=false;bossT=0;bossWin=0; fx.forEach(f=>scene.remove(f.m));fx=[]; $('boss').style.display='none';$('banner').style.display='none';gem.g.visible=false;gem.wait=2;
+}
+function start(){reset();state='play';show('')}
+const fin=m=>{if(!models.starbie&&!m)return};
+function pick(i){lvl=i; applyLevel(); state='tut'; show('tut')}          // pantalla del nombre del nivel + PLAY
+const toSel=()=>{state='sel';show('sel')};
+$('play').onclick=()=>{if(state==='menu')toSel()};
+$('rg').onclick=()=>{state='menu';show('start')};   // reiniciar juego: vuelve al inicio
+$('selBack').onclick=()=>{state='menu';show('start')};
+$('tutBack').onclick=toSel; $('m1').onclick=toSel; $('m2').onclick=toSel;
+$('go').onclick=start; $('r1').onclick=start;
+$('r2').onclick=()=>pick(Math.min(lvl+1,LEVELS.length-1));                // siguiente nivel
+applyLevel();
+
+// Botones 1, 2, 3 del selector de niveles
+document.querySelectorAll('.lvbtn').forEach(b=>b.onclick=()=>pick(+b.dataset.i));
+$('play').style.opacity=1; $('loading').style.display='none';
+
+/* ---------- Entradas ---------- */
+addEventListener('keydown',e=>{
+  keys[e.code]=true; if(e.code==='Space')e.preventDefault(); if(e.repeat||state!=='play')return;
+  if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&player.dashCd<=0){player.dash=CFG.dashTime;player.dashCd=CFG.dashCd}   // dash
+  if(e.code==='Space'&&!player.air){player.vy=CFG.jump;player.air=true}                                                     // salto
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('mousemove',e=>{
+  mouse.x=e.clientX;mouse.y=e.clientY;$('ret').style.left=e.clientX+'px';$('ret').style.top=e.clientY+'px';
+  if(state==='play'&&(e.buttons&2)){camYaw-=e.movementX*.006;camPitch=THREE.MathUtils.clamp(camPitch+e.movementY*.004,.12,1.25)}
+});
+addEventListener('mousedown',e=>{if(state==='play'&&e.button===0){holding=true;hold=0}});
+addEventListener('mouseup',e=>{
+  if(state!=='play'||e.button!==0||!holding)return; holding=false; charge.visible=false;
+  if(hold>=CFG.ultHold&&ultCd<=0){fireUlt()} else if(ess>=CFG.shotCost){ess-=CFG.shotCost;fireBasic()}
+  hold=0;
+});
+
+/* ---------- Disparos ---------- */
+function muzzle(){
+  const a=CFG.antennas[player.ai^=1];
+  return new THREE.Vector3(...a).applyAxisAngle(new THREE.Vector3(0,1,0),player.g.rotation.y).add(player.g.position);
+}
+function aimDir(from){
+  ray.setFromCamera(new THREE.Vector2(mouse.x/innerWidth*2-1,-(mouse.y/innerHeight)*2+1),cam);
+  const p=new THREE.Vector3(); 
+  if(!ray.ray.intersectPlane(plane,p)) return new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),camYaw);
+  const d=p.sub(from); d.y=0; return d.lengthSq()<.01?new THREE.Vector3(0,0,-1):d.normalize();
+}
+function addShot(pos,dir,r,speed,life,big,color){
+  const m=new THREE.Mesh(shotGeo,new THREE.MeshBasicMaterial({color}));m.scale.setScalar(r);m.position.copy(pos);scene.add(m);
+  shots.push({m,v:dir.clone().multiplyScalar(speed),life,r,big});
+}
+function fireBasic(){const p=muzzle(),d=aimDir(p);player.g.rotation.y=Math.atan2(d.x,d.z);addShot(p,d,.2,22,1.5,false,0x2bf6ff)}
+function fireUlt(){const p=muzzle(),d=aimDir(p);player.g.rotation.y=Math.atan2(d.x,d.z);ultCd=CFG.ultCd;addShot(p,d,1.4,11,1.6,true,0xff2bf0)}
+
+/* ---------- Enemigos, amigos, purificación ---------- */
+function spawnEnemy(){
+  const g=make('stargord',1);
+  if(pitComps.length&&Math.random()<.65){ // sale de un pozo fijo
+    const c=pitComps[Math.floor(Math.random()*pitComps.length)], q=c[Math.floor(Math.random()*c.length)]; g.position.set(q[0],spawnY(q[0],q[1]),q[1]);
+  }else{ const pz=puddles[Math.floor(Math.random()*L.rand)]; g.position.set(pz.position.x,spawnY(pz.position.x,pz.position.z),pz.position.z) }
+  g.scale.setScalar(.1);scene.add(g);
+  enemies.push({g,t:0,rise:0,vy:0,air:false});spawned++;
+}
+function purify(e){
+  scene.remove(e.g);enemies.splice(enemies.indexOf(e),1);
+  const g=make('starbie',1);g.position.copy(e.g.position);g.scale.setScalar(1);scene.add(g);friends.push({g,t:0});
+  purified++;score+=100;
+}
+function banner(t,ms){const b=$('banner');b.textContent=t;b.style.display='block';clearTimeout(banner.id);banner.id=setTimeout(()=>b.style.display='none',ms)}
+function spawnBoss(){
+  const g=make('stargord',2.6); g.traverse(m=>{ if(m.isMesh)m.material=m.material.clone() });   // material propio para parpadear al recibir daño
+  const pp=player.g.position, c=[[-3,-3],[3,-3],[-3,3],[3,3]].sort((a,b)=>Math.hypot(b[0]-pp.x,b[1]-pp.z)-Math.hypot(a[0]-pp.x,a[1]-pp.z))[0];
+  g.position.set(c[0],spawnY(c[0],c[1]),c[1]); g.scale.setScalar(.1); scene.add(g);
+  boss={g,hp:CFG.bossHp,max:CFG.bossHp,t:0,rise:0,vy:0,air:false,slamCd:8,sl:false,flash:0,mats:[]};
+  g.traverse(m=>{ if(m.isMesh&&m.material.emissive)boss.mats.push(m.material) });
+  $('boss').style.display='block'; banner('¡STARGOR REY!',2400);
+}
+function damageBoss(n){
+  if(!boss||boss.hp<=0)return; boss.hp=Math.max(0,boss.hp-n); boss.flash=.5; score+=Math.round(n/10); if(boss.hp>0)return;
+  const g=make('starbie',2.6); g.position.copy(boss.g.position); scene.add(g); friends.push({g,t:0});   // se purifica y se vuelve un Starbie gigante
+  scene.remove(boss.g); boss=null; score+=1000; bossWin=2.8; $('boss').style.display='none'; banner('¡STARGOR REY PURIFICADO!',2600);
+}
+function bossHit(s){
+  if(!boss||boss.rise<.6)return; const b=boss.g.position,m=s.m.position;
+  if(Math.hypot(b.x-m.x,b.z-m.z)<s.r+1.2){ if(s.big){ if(!s.hitBoss){s.hitBoss=true;damageBoss(CFG.ultDmg)} } else {damageBoss(CFG.shotDmg);s.life=0} }
+}
+function shock(pos){ // onda de choque al aterrizar el jefe
+  const m=new THREE.Mesh(new THREE.RingGeometry(.6,1,32),new THREE.MeshBasicMaterial({color:0xff4de0,transparent:true,opacity:.8,side:THREE.DoubleSide,depthWrite:false}));
+  m.rotation.x=-Math.PI/2; m.position.set(pos.x,pos.y+.08,pos.z); scene.add(m); fx.push({m,t:0});
+  const p=player.g.position; if(Math.hypot(p.x-pos.x,p.z-pos.z)<4&&player.h<.6)corr+=8;
+}
+function placeGem(){const sp=randSpot(.8);gem.g.position.set(sp[0],0,sp[1]);gem.g.scale.setScalar(1);gem.g.visible=true;gem.t=CFG.gemTime}
+const nearPuddle=(p,r=1.3*(L.puddleScale||1))=>inPit(p.x,p.z)||puddles.some((q,i)=>i<L.rand&&Math.hypot(q.position.x-p.x,q.position.z-p.z)<r);
+function end(win){
+  state=win?'win':'over';holding=false;charge.visible=false;$(win?'ws':'os').textContent=score; $('es').textContent=score;
+  if(win){const last=lvl>=LEVELS.length-1;
+    $('wh').textContent=last?'¡JUEGO COMPLETADO!':'¡NIVEL COMPLETADO!'; $('wt').textContent=L.done||(L.name+' quedó purificada.');
+    $('r2').style.display=last?'none':'inline-block'}
+  show(win?(lvl>=LEVELS.length-1?'end':'win'):'over')   // al ganar el último nivel: pantalla final
+}
+
+/* ---------- Bucle principal ---------- */
+const clock=new THREE.Clock(), Y=new THREE.Vector3(0,1,0);
+function update(dt){
+  const p=player.g.position;
+  if(keys.KeyQ)camYaw+=2*dt; if(keys.KeyE)camYaw-=2*dt;
+  // Movimiento relativo a cámara
+  const fwd=new THREE.Vector3(-Math.sin(camYaw),0,-Math.cos(camYaw)), right=new THREE.Vector3(-fwd.z,0,fwd.x);
+  const dir=new THREE.Vector3();
+  if(keys.KeyW)dir.add(fwd);if(keys.KeyS)dir.sub(fwd);if(keys.KeyD)dir.add(right);if(keys.KeyA)dir.sub(right);
+  const inPud=player.h<.4&&nearPuddle(p);
+  if(dir.lengthSq()>0){
+    dir.normalize();
+    const ty=Math.atan2(dir.x,dir.z);let df=ty-player.g.rotation.y;df=Math.atan2(Math.sin(df),Math.cos(df));
+    if(!holding)player.g.rotation.y+=df*Math.min(1,14*dt);
+  }
+  let sp=CFG.walk*(inPud?CFG.puddleSlow:1);
+  if(player.dash>0){player.dash-=dt;sp=CFG.dash;if(dir.lengthSq()===0)dir.set(Math.sin(player.g.rotation.y),0,Math.cos(player.g.rotation.y))}
+  player.dashCd-=dt;
+  moveBody(p,player,dir.x*sp*dt,dir.z*sp*dt,dt,false);
+  p.x=THREE.MathUtils.clamp(p.x,-L.arena,L.arena);p.z=THREE.MathUtils.clamp(p.z,-L.arena,L.arena);
+  animate(player.g,dt,dir.lengthSq()>0?sp/CFG.walk:0);
+  if(inPud)corr+=CFG.puddleCorr*dt;
+
+  // Esencia y ulti
+  ess=Math.min(100,ess+CFG.essenceRegen*dt); ultCd=Math.max(0,ultCd-dt);
+  if(holding){hold+=dt;if(hold>.25){charge.visible=true;const m=muzzle();m.y=1.1;charge.position.copy(m);charge.scale.setScalar(.1+.5*Math.min(hold/CFG.ultHold,1))}}
+
+  // Charcos móviles
+  moveT-=dt;if(moveT<=0){moveT=12;const q=puddles[Math.floor(Math.random()*L.rand)],sp=randSpot(1);q.position.set(sp[0],puddleY(sp[0],sp[1]),sp[1])}
+
+  // Spawn enemigos
+  spawnT-=dt;if(spawnT<=0&&spawned<L.goal&&enemies.length<(L.maxAlive||CFG.maxAlive)){spawnEnemy();spawnT=2.5}
+
+  // Enemigos
+  for(const e of [...enemies]){
+    e.t+=dt;const g=e.g;
+    if(e.rise<1){e.rise=Math.min(1,e.rise+dt*2);g.scale.setScalar(.1+.9*e.rise)}
+    const d=new THREE.Vector3().subVectors(p,g.position);d.y=0;const dist=d.length();
+    if(dist>.9){d.normalize();g.rotation.y=Math.atan2(d.x,d.z)}
+    else{if(player.h<.5)corr+=CFG.contactCorr*dt;g.scale.setScalar(1+Math.sin(e.t*30)*.08)} // mordida (si saltas, la esquivas)
+    g.position.x=THREE.MathUtils.clamp(g.position.x,-L.arena,L.arena);g.position.z=THREE.MathUtils.clamp(g.position.z,-L.arena,L.arena);
+    {const k=dist>.9?(CFG.chase+purified*.08)*dt:0; moveBody(g.position,e,d.x*k,d.z*k,dt,true)} animate(g,dt,dist>.9?.9:.3);
+  }
+  // Jefe final (nivel 3): aparece al purificar a todos los Stargords normales
+  if(L.boss&&!bossCalled&&purified>=L.goal){bossCalled=true;bossT=3;banner('¡EL JEFE SE ACERCA!',2800)}
+  if(bossCalled&&!boss&&bossWin<=0&&bossT>0){bossT-=dt;if(bossT<=0)spawnBoss()}
+  if(boss){
+    const B=boss,g=B.g; B.t+=dt;
+    if(B.rise<1){B.rise=Math.min(1,B.rise+dt*.8);g.scale.setScalar(.1+.9*B.rise)}
+    const d=new THREE.Vector3().subVectors(p,g.position); d.y=0; const dist=d.length(); if(dist>.01)d.normalize();
+    if(B.rise>=1){
+      g.rotation.y=Math.atan2(d.x,d.z);
+      const sp=(CFG.chase*.7+(1-B.hp/B.max)*.8)*(B.air?2:1), mv=(dist>1.6||B.air)?sp*dt:0, was=B.air;
+      moveBody(g.position,B,d.x*mv,d.z*mv,dt,true);
+      if(was&&!B.air&&B.sl){B.sl=false;shock(g.position)}
+      B.slamCd-=dt; if(B.slamCd<=0&&!B.air&&dist<9){B.air=true;B.vy=10;B.sl=true;B.slamCd=9}   // salto con onda de choque
+      if(dist<1.9&&player.h<.5)corr+=9*dt;                                                    // mordida del jefe
+    }else moveBody(g.position,B,0,0,dt,false);
+    animate(g,dt,B.air?1.5:(dist>1.6?.8:.3));
+    B.flash=Math.max(0,B.flash-dt*2.5); B.mats.forEach(t=>t.emissive.setRGB(B.flash,B.flash*.15,B.flash));
+    $('fb').style.width=(100*B.hp/B.max)+'%'; $('tb').textContent=Math.ceil(B.hp)+' / '+B.max;
+  }
+  for(const f of [...fx]){f.t+=dt;f.m.scale.setScalar(1+f.t*8);f.m.material.opacity=Math.max(0,.8-f.t*1.8);if(f.t>.45){scene.remove(f.m);fx.splice(fx.indexOf(f),1)}}
+  // Proyectiles
+  for(const s of [...shots]){
+    const n=Math.ceil(s.v.length()*dt/.25);   // subpasos: el disparo rápido ya no atraviesa enemigos
+    for(let i=0;i<n&&s.life>0;i++){
+      s.m.position.addScaledVector(s.v,dt/n);
+      for(const e of [...enemies]){
+        if(Math.hypot(e.g.position.x-s.m.position.x,e.g.position.z-s.m.position.z)<s.r+.7){purify(e);if(!s.big){s.life=0;break}}
+      }
+      if(boss&&s.life>0)bossHit(s);
+    }
+    s.life-=dt;
+    if(s.life<=0||Math.abs(s.m.position.x)>12||Math.abs(s.m.position.z)>12){scene.remove(s.m);shots.splice(shots.indexOf(s),1)}
+    else if(s.big)s.m.scale.setScalar(s.r*(1+.15*Math.sin(performance.now()/60)));
+  }
+  // Starbies purificados (saltan y se desvanecen)
+  for(const f of [...friends]){f.t+=dt;f.g.position.y=ground(f.g.position.x,f.g.position.z)+Math.abs(Math.sin(f.t*9))*.5;f.g.rotation.y+=dt*6;animate(f.g,dt,1.5);
+    if(f.t>2){f.g.scale.setScalar(Math.max(0,1-(f.t-2)*2));if(f.t>2.5){scene.remove(f.g);friends.splice(friends.indexOf(f),1)}}}
+
+  // Gema
+  if(gem.g.visible){
+    gem.t-=dt;gem.g.rotation.y+=dt*3;gem.g.scale.setScalar(gem.t<1.5?1+.25*Math.sin(gem.t*18):1);   // palpita en el último 1.5 s
+    gem.g.position.y=.3+Math.sin(performance.now()/250)*.15;
+    if(Math.hypot(gem.g.position.x-p.x,gem.g.position.z-p.z)<1){corr=Math.max(0,corr-CFG.gemHeal);ess=100;gem.g.visible=false;gem.wait=4}
+    else if(gem.t<=0){gem.g.visible=false;gem.wait=1.5}
+  }else{gem.wait-=dt;if(gem.wait<=0)placeGem()}
+
+  // Cámara orbital
+  const cd=7,cp=Math.cos(camPitch);
+  const target=new THREE.Vector3(p.x,p.y+1,p.z);
+  const cdir=new THREE.Vector3(Math.sin(camYaw)*cp,Math.sin(camPitch),Math.cos(camYaw)*cp);
+  let want=cd; const rgt=new THREE.Vector3(Math.cos(camYaw),0,-Math.sin(camYaw));
+  for(const [ox,oy] of [[0,0],[.45,0],[-.45,0],[0,.45]]){
+    const org=target.clone().addScaledVector(rgt,ox); org.y+=oy; camRay.set(org,cdir); camRay.far=cd+.7;
+    const h=camRay.intersectObjects(L.blockers,false)[0]; if(h)want=Math.min(want,Math.max(1.3,h.distance-.7));
+  }               // se acerca al jugador si hay un edificio detrás
+  camDist=want<camDist?want:camDist+(want-camDist)*Math.min(1,dt*5); // y se aleja suavemente al despejarse
+  cam.position.copy(target).addScaledVector(cdir,camDist);
+  cam.lookAt(target);
+
+  // HUD
+  corr=Math.min(100,corr);
+  $('fc').style.width=corr+'%';$('tc').textContent=Math.round(corr)+'%';
+  $('fe').style.width=ess+'%';$('te').textContent=Math.round(ess);
+  const uPct=holding&&ultCd<=0?Math.min(hold/CFG.ultHold,1):1-ultCd/CFG.ultCd;
+  $('fu').style.width=uPct*100+'%';$('tu').textContent=ultCd>0?ultCd.toFixed(1)+'s':(holding&&hold>=CFG.ultHold?'¡SUELTA!':'LISTA');
+  $('sc').textContent=score;$('rm').textContent=(L.boss&&purified>=L.goal)?'JEFE':L.goal-purified;
+
+  if(corr>=100)end(false); else if(L.boss){ if(bossWin>0&&(bossWin-=dt)<=0)end(true) } else if(purified>=L.goal)end(true);
+}
+renderer.setAnimationLoop(()=>{
+  const dt=Math.min(clock.getDelta(),.05);
+  if(state==='play')update(dt);
+  else{const t=performance.now()/6000;cam.position.set(Math.sin(t)*14,8,Math.cos(t)*14);cam.lookAt(0,1,0)}
+  sky.position.copy(cam.position);
+  renderer.render(scene,cam);
+});
+</script>
+</body>
+</html>
