@@ -64,6 +64,7 @@ h1{margin:0 0 10px;font-size:clamp(28px,5vw,48px);color:var(--lime);text-shadow:
 #end h1{font-size:clamp(30px,5.5vw,56px);margin:0 0 12px}
 #end p{margin:8px 0;font-family:"Trebuchet MS",sans-serif;font-weight:bold;font-size:clamp(16px,2.4vw,24px);line-height:1.5}
 #end .sc{color:var(--lime);font-family:"Arial Black",sans-serif}
+#toast{position:fixed;left:16px;bottom:16px;padding:6px 14px;border-radius:12px;background:rgba(5,10,20,.85);color:#fff;font-size:13px;display:none;z-index:6;border:2px solid var(--teal)}
 </style>
 </head>
 <body>
@@ -99,7 +100,7 @@ h1{margin:0 0 10px;font-size:clamp(28px,5vw,48px);color:var(--lime);text-shadow:
       <b>Clic derecho + arrastrar</b> (o <b>Q / E</b>) girar la cámara<br>
       <b>Mouse</b> apuntar · <b>Clic izquierdo</b> disparar (gasta Esencia Pura)<br>
       <b>Mantén clic 1 s</b> y suelta: ¡ULTI en área!<br>
-      <b>Shift</b> dash · <b>Espacio</b> saltar<br>
+      <b>Shift</b> dash · <b>Espacio</b> saltar · <b>M</b> silenciar<br>
       Purifica a todos los Stargords antes de que la corrupción llegue al 100 %. Evita los <b>charcos</b> y recoge las <b>gemas</b>.
     </div>
   </div>
@@ -128,6 +129,7 @@ h1{margin:0 0 10px;font-size:clamp(28px,5vw,48px);color:var(--lime);text-shadow:
   <div class="box" id="hr">Score <b id="sc">0</b><br>Stargords restantes <b id="rm">10</b></div>
 </div>
 <div id="banner"></div>
+<div id="toast"></div>
 <div id="ret"></div>
 
 <div id="over" class="screen"><div class="panel"><h1>GAME OVER</h1><p>La corrupción llegó al 100%.</p><p>Score: <span id="os">0</span></p></div><button class="btn" id="r1">Reiniciar</button><button class="btn sm" id="m1">Elegir nivel</button></div>
@@ -160,11 +162,11 @@ const CFG = {
 
 const $ = id => document.getElementById(id);
 const FOLDERS=['','STARBIE/','STARGORS/','STARGORDS/','GÁRFICO/','GRÁFICO/','GRAFICO/','FONTS/'];
-function candidates(names){ // todas las rutas posibles de un archivo: raíz o subcarpetas, con espacios o guiones bajos
+function candidates(names,folders=FOLDERS){ // todas las rutas posibles de un archivo: raíz o subcarpetas, con espacios o guiones bajos
   const out=[];
   for(const n of [].concat(names))
     for(const v of [n,n.replace(/ /g,'_'),n.replace(/_/g,' '),n.replace(/[ _]+/g,' '),n.replace(/[ _]+/g,'_'),n.replace(/[ _]+\./,'.')])
-      for(const f of FOLDERS) out.push(f+v);
+      for(const f of folders) out.push(f+v);
   return [...new Set(out)];
 }
 function pickImg(names,cb){ // carga la primera imagen que exista
@@ -175,6 +177,85 @@ function pickImg(names,cb){ // carga la primera imagen que exista
 pickImg('LOGO STARBIE.png',u=>{$('logo').src=u;$('logo2').src=u;$('logo3').src=u});
 pickImg('Boton PLAY.png',u=>{$('play').src=u;$('go').src=u});
 pickImg('GÁRFICO/PantallaFondo.png',u=>{$('bg').src=u;$('bg').style.display='block';$('bg2').src=u;$('bg2').style.display='block';$('bg3').src=u;$('bg3').style.display='block'});
+/* ================= AUDIO ================= */
+// Tus archivos: ponlos junto al HTML o en una carpeta (audio/, sonidos/, musica/...). Se buscan con espacios o guiones bajos.
+const AUDIO_FILES={ n1:'MusicaNivel1.mp3', n2:'MusicaNivel2.mp3', n3:'MusicaNivel3.mp3', n3b:'MusicaNivel3Boss.mp3', shot:'DisparoBasico.mp3', ult:'DisparoUlti.mp3' };
+const AUDIO_FOLDERS=['','audio/','Audio/','AUDIO/','SONIDOS/','Sonidos/','sonidos/','SONIDO/','MUSICA/','Música/','MÚSICA/','Musica/','SFX/'];
+const AU={ctx:null,master:null,bufs:{},music:{},cur:null,muted:false,vol:.5,warned:{}};
+let puddleCd=0, biteCd=0;
+try{ AU.ctx=new (window.AudioContext||window.webkitAudioContext)(); AU.master=AU.ctx.createGain(); AU.master.connect(AU.ctx.destination) }catch(e){ AU.ctx=null }
+['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{ if(AU.ctx&&AU.ctx.state==='suspended')AU.ctx.resume() }));   // el navegador exige un clic/tecla para activar el audio
+function audioWarn(name){ if(AU.warned[name])return; AU.warned[name]=1; $('warn').textContent+='⚠ No se encontró el audio '+name+'. ' }
+async function findAudio(name){
+  for(const u of candidates(name,AUDIO_FOLDERS)){
+    try{ const r=await fetch(encodeURI(u),{method:'HEAD'}); if(r.ok&&!/text\/html/i.test(r.headers.get('content-type')||''))return encodeURI(u) }catch(e){}
+  }
+  audioWarn(name); return null;
+}
+async function loadSfx(key){ // efectos cortos: se decodifican en memoria para sonar sin retraso
+  const u=await findAudio(AUDIO_FILES[key]); if(!u||!AU.ctx)return;
+  try{ AU.bufs[key]=await AU.ctx.decodeAudioData(await (await fetch(u)).arrayBuffer()) }catch(e){ console.warn('audio',key,e) }
+}
+['shot','ult'].forEach(loadSfx);
+
+// ---- Música (se carga solo cuando hace falta, con fundido al cambiar)
+async function prepare(key){
+  const m=AU.music[key]||(AU.music[key]={el:null,vol:0,target:0,loading:false});
+  if(!m.el&&!m.loading){ m.loading=true; const u=await findAudio(AUDIO_FILES[key]); m.loading=false;
+    if(u){ const a=new Audio(u); a.loop=true; a.preload='auto'; a.volume=0; m.el=a } }
+  return m;
+}
+async function setMusic(key){
+  AU.cur=key; for(const k in AU.music)AU.music[k].target=0;      // las demás pistas se desvanecen
+  if(!key)return;
+  const m=await prepare(key); if(!m.el||AU.cur!==key)return;
+  m.target=AU.vol; if(m.el.paused)m.el.play().catch(()=>{});
+  if(key==='n3')prepare('n3b');                                   // precarga la música del jefe
+}
+function musicTick(dt){
+  for(const k in AU.music){ const m=AU.music[k]; if(!m.el)continue;
+    const step=dt*AU.vol/(m.target>m.vol?1.2:.7); m.vol=m.vol<m.target?Math.min(m.target,m.vol+step):Math.max(m.target,m.vol-step);
+    m.el.volume=AU.muted?0:Math.min(1,Math.max(0,m.vol));
+    if(m.target===0&&m.vol<=.001&&!m.el.paused){ m.el.pause(); m.el.currentTime=0 }
+  }
+}
+document.addEventListener('visibilitychange',()=>{ for(const k in AU.music){ const m=AU.music[k]; if(!m.el)continue; if(document.hidden)m.el.pause(); else if(m.target>0)m.el.play().catch(()=>{}) } });
+function toggleMute(){
+  AU.muted=!AU.muted; if(AU.master)AU.master.gain.value=AU.muted?0:1;
+  const t=$('toast'); t.textContent=AU.muted?'🔇 Sonido silenciado (M)':'🔊 Sonido activado (M)'; t.style.display='block'; clearTimeout(toggleMute.id); toggleMute.id=setTimeout(()=>t.style.display='none',1600);
+}
+addEventListener('keydown',e=>{ if(e.code==='KeyM'&&!e.repeat)toggleMute() });
+
+// ---- Efectos
+function sfxBuf(key,vol=1,max=0){
+  const b=AU.bufs[key]; if(!b||!AU.ctx)return;
+  const s=AU.ctx.createBufferSource(), g=AU.ctx.createGain(), t=AU.ctx.currentTime; s.buffer=b; g.gain.value=vol; s.connect(g); g.connect(AU.master);
+  if(max&&b.duration>max){ g.gain.setValueAtTime(vol,t+max-.25); g.gain.linearRampToValueAtTime(0,t+max); s.start(t); s.stop(t+max) } else s.start(t);
+}
+function tone(type,f0,f1,dur,vol,delay=0){
+  if(!AU.ctx)return; const c=AU.ctx,t=c.currentTime+delay,o=c.createOscillator(),g=c.createGain(); o.type=type;
+  o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+.01); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(AU.master); o.start(t); o.stop(t+dur+.02);
+}
+function noise(dur,vol,type,f0,f1,q=1,delay=0){
+  if(!AU.ctx)return; const c=AU.ctx,t=c.currentTime+delay,n=Math.max(1,Math.floor(c.sampleRate*dur)),buf=c.createBuffer(1,n,c.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+  const s=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain(); s.buffer=buf; f.type=type; f.Q.value=q;
+  f.frequency.setValueAtTime(f0,t); f.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+dur*.15); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  s.connect(f); f.connect(g); g.connect(AU.master); s.start(t);
+}
+const SFX={ // sonidos generados por código (no necesitan archivos)
+  gem:()=>{tone('triangle',880,1320,.14,.35);tone('triangle',1320,1760,.18,.3,.09);tone('sine',2640,3520,.25,.12,.16)},   // campanita ascendente
+  splash:()=>{noise(.35,.5,'bandpass',900,220,1.2);tone('sine',180,70,.22,.35)},                                            // chapoteo
+  dash:()=>{noise(.22,.45,'bandpass',500,3200,.8)},                                                                          // zumbido de aire
+  jump:()=>{tone('square',280,720,.16,.16);tone('sine',420,900,.16,.2)},                                                     // boing
+  bite:()=>{tone('sawtooth',170,70,.09,.35);tone('sawtooth',150,60,.11,.35,.11);noise(.09,.35,'lowpass',2500,600,.7);noise(.1,.3,'lowpass',2500,600,.7,.11)} // mordida
+};
+function sfx(k){ if(AU.muted)return; if(k==='shot')sfxBuf('shot',.7,1.2); else if(k==='ult')sfxBuf('ult',.9); else if(SFX[k])SFX[k]() }   // el disparo básico se corta a 1,2 s
+/* ========================================== */
+
 const rnd = (a,b)=>a+Math.random()*(b-a);
 const renderer = new THREE.WebGLRenderer({canvas:$('c'),antialias:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
@@ -336,15 +417,15 @@ caveG.traverse(m=>{
 });
 
 const LEVELS=[
-  {name:'La Gran Ciudad', root:city, blockers:camBlockers, title:'¡Purifica la ciudad!', goal:10, arena:8, rand:5, bg:0x2a1f5c, start:[0,6], note:'', done:'La Gran Ciudad quedó purificada.',
+  {name:'La Gran Ciudad', music:'n1', root:city, blockers:camBlockers, title:'¡Purifica la ciudad!', goal:10, arena:8, rand:5, bg:0x2a1f5c, start:[0,6], note:'', done:'La Gran Ciudad quedó purificada.',
    light:{hemi:[0xcfe8ff,0xb59f7a,1.9], sun:[0xfff1d0,2.6,[10,24,8]], fog:[0xd8f0ff,35,80]},          // mediodía, cielo azul
    sky:[[0,'#2a78ee'],[.35,'#74bfff'],[.5,'#d8f0ff'],[1,'#e8f7ff']]},
-  {name:'Las Tuberías', root:pipesG, blockers:camWalls, title:'¡Limpia las tuberías!', goal:25, arena:7, rand:3, maxAlive:5, bg:0x0f2c35, start:[0,1], done:'Las Tuberías quedaron purificadas.',
+  {name:'Las Tuberías', music:'n2', root:pipesG, blockers:camWalls, title:'¡Limpia las tuberías!', goal:25, arena:7, rand:3, maxAlive:5, bg:0x0f2c35, start:[0,1], done:'Las Tuberías quedaron purificadas.',
    light:{hemi:[0x8a78b8,0x2b1c24,1.0], sun:[0xff8a3a,2.3,[-8,9,2]], fog:[0x3a2038,12,40]},          // atardecer
    sky:[[0,'#0e0c26'],[.3,'#3a1d4c'],[.46,'#c0506a'],[.5,'#ff9a55'],[.56,'#4a2440'],[1,'#120a18']],
    note:'Los <b>pozos con charco</b> del suelo ralentizan y suben la corrupción, ¡y de ellos también salen Stargords!',
    ...buildGrid(pipesG)},
-  {name:'El Nido Stargor', root:caveG, blockers:caveMesh?[caveMesh]:[], title:'¡Destruye el nido!', goal:25, arena:4.3, rand:4, maxAlive:5, boss:true, puddleScale:.7, bg:0x120620, start:[0,1.5],
+  {name:'El Nido Stargor', music:'n3', root:caveG, blockers:caveMesh?[caveMesh]:[], title:'¡Destruye el nido!', goal:25, arena:4.3, rand:4, maxAlive:5, boss:true, puddleScale:.7, bg:0x120620, start:[0,1.5],
    note:'Purifica a los 25 Stargords y aparecerá el <b>STARGOR REY</b>: ¡necesita <b>'+CFG.bossHp+'</b> de daño! Los charcos y las gemas siguen apareciendo.',
    done:'El Nido Stargor quedó purificado.',
    light:{hemi:[0xc9a4ff,0x4a2a70,2.4], sun:[0xe0c8ff,1.5,[2,14,4]], fog:[0x120620,10,40]},
@@ -445,7 +526,7 @@ function reset(){
   camYaw=0; player.g.position.set(L.start[0],0,L.start[1]);player.vel.set(0,0,0);player.vy=0;player.air=false;player.h=0;
   if(boss){scene.remove(boss.g);boss=null} bossCalled=false;bossT=0;bossWin=0; fx.forEach(f=>scene.remove(f.m));fx=[]; $('boss').style.display='none';$('banner').style.display='none';gem.g.visible=false;gem.wait=2;
 }
-function start(){reset();state='play';show('')}
+function start(){reset();state='play';show('');setMusic(L.music)}
 const fin=m=>{if(!models.starbie&&!m)return};
 function pick(i){lvl=i; applyLevel(); state='tut'; show('tut')}          // pantalla del nombre del nivel + PLAY
 const toSel=()=>{state='sel';show('sel')};
@@ -464,8 +545,8 @@ $('play').style.opacity=1; $('loading').style.display='none';
 /* ---------- Entradas ---------- */
 addEventListener('keydown',e=>{
   keys[e.code]=true; if(e.code==='Space')e.preventDefault(); if(e.repeat||state!=='play')return;
-  if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&player.dashCd<=0){player.dash=CFG.dashTime;player.dashCd=CFG.dashCd}   // dash
-  if(e.code==='Space'&&!player.air){player.vy=CFG.jump;player.air=true}                                                     // salto
+  if((e.code==='ShiftLeft'||e.code==='ShiftRight')&&player.dashCd<=0){player.dash=CFG.dashTime;player.dashCd=CFG.dashCd;sfx('dash')}   // dash
+  if(e.code==='Space'&&!player.air){player.vy=CFG.jump;player.air=true;sfx('jump')}                                                     // salto
 });
 addEventListener('keyup',e=>keys[e.code]=false);
 addEventListener('contextmenu',e=>e.preventDefault());
@@ -495,8 +576,8 @@ function addShot(pos,dir,r,speed,life,big,color){
   const m=new THREE.Mesh(shotGeo,new THREE.MeshBasicMaterial({color}));m.scale.setScalar(r);m.position.copy(pos);scene.add(m);
   shots.push({m,v:dir.clone().multiplyScalar(speed),life,r,big});
 }
-function fireBasic(){const p=muzzle(),d=aimDir(p);player.g.rotation.y=Math.atan2(d.x,d.z);addShot(p,d,.2,22,1.5,false,0x2bf6ff)}
-function fireUlt(){const p=muzzle(),d=aimDir(p);player.g.rotation.y=Math.atan2(d.x,d.z);ultCd=CFG.ultCd;addShot(p,d,1.4,11,1.6,true,0xff2bf0)}
+function fireBasic(){const p=muzzle(),d=aimDir(p);player.g.rotation.y=Math.atan2(d.x,d.z);addShot(p,d,.2,22,1.5,false,0x2bf6ff);sfx('shot')}
+function fireUlt(){const p=muzzle(),d=aimDir(p);player.g.rotation.y=Math.atan2(d.x,d.z);ultCd=CFG.ultCd;addShot(p,d,1.4,11,1.6,true,0xff2bf0);sfx('ult')}
 
 /* ---------- Enemigos, amigos, purificación ---------- */
 function spawnEnemy(){
@@ -519,7 +600,7 @@ function spawnBoss(){
   g.position.set(c[0],spawnY(c[0],c[1]),c[1]); g.scale.setScalar(.1); scene.add(g);
   boss={g,hp:CFG.bossHp,max:CFG.bossHp,t:0,rise:0,vy:0,air:false,slamCd:8,sl:false,flash:0,mats:[]};
   g.traverse(m=>{ if(m.isMesh&&m.material.emissive)boss.mats.push(m.material) });
-  $('boss').style.display='block'; banner('¡STARGOR REY!',2400);
+  $('boss').style.display='block'; banner('¡STARGOR REY!',2400); setMusic('n3b');   // empieza la música del jefe
 }
 function damageBoss(n){
   if(!boss||boss.hp<=0)return; boss.hp=Math.max(0,boss.hp-n); boss.flash=.5; score+=Math.round(n/10); if(boss.hp>0)return;
@@ -537,7 +618,7 @@ function shock(pos){ // onda de choque al aterrizar el jefe
 }
 function placeGem(){const sp=randSpot(.8);gem.g.position.set(sp[0],0,sp[1]);gem.g.scale.setScalar(1);gem.g.visible=true;gem.t=CFG.gemTime}
 const nearPuddle=(p,r=1.3*(L.puddleScale||1))=>inPit(p.x,p.z)||puddles.some((q,i)=>i<L.rand&&Math.hypot(q.position.x-p.x,q.position.z-p.z)<r);
-function end(win){
+function end(win){ setMusic(null);
   state=win?'win':'over';holding=false;charge.visible=false;$(win?'ws':'os').textContent=score; $('es').textContent=score;
   if(win){const last=lvl>=LEVELS.length-1;
     $('wh').textContent=last?'¡JUEGO COMPLETADO!':'¡NIVEL COMPLETADO!'; $('wt').textContent=L.done||(L.name+' quedó purificada.');
@@ -555,6 +636,7 @@ function update(dt){
   const dir=new THREE.Vector3();
   if(keys.KeyW)dir.add(fwd);if(keys.KeyS)dir.sub(fwd);if(keys.KeyD)dir.add(right);if(keys.KeyA)dir.sub(right);
   const inPud=player.h<.4&&nearPuddle(p);
+  puddleCd-=dt; biteCd-=dt; if(inPud&&!player.wasPud&&puddleCd<=0){sfx('splash');puddleCd=.4} player.wasPud=inPud;   // sonido al pisar un charco
   if(dir.lengthSq()>0){
     dir.normalize();
     const ty=Math.atan2(dir.x,dir.z);let df=ty-player.g.rotation.y;df=Math.atan2(Math.sin(df),Math.cos(df));
@@ -584,7 +666,7 @@ function update(dt){
     if(e.rise<1){e.rise=Math.min(1,e.rise+dt*2);g.scale.setScalar(.1+.9*e.rise)}
     const d=new THREE.Vector3().subVectors(p,g.position);d.y=0;const dist=d.length();
     if(dist>.9){d.normalize();g.rotation.y=Math.atan2(d.x,d.z)}
-    else{if(player.h<.5)corr+=CFG.contactCorr*dt;g.scale.setScalar(1+Math.sin(e.t*30)*.08)} // mordida (si saltas, la esquivas)
+    else{if(player.h<.5){corr+=CFG.contactCorr*dt;if(biteCd<=0){sfx('bite');biteCd=.8}}g.scale.setScalar(1+Math.sin(e.t*30)*.08)} // mordida (si saltas, la esquivas)
     g.position.x=THREE.MathUtils.clamp(g.position.x,-L.arena,L.arena);g.position.z=THREE.MathUtils.clamp(g.position.z,-L.arena,L.arena);
     {const k=dist>.9?(CFG.chase+purified*.08)*dt:0; moveBody(g.position,e,d.x*k,d.z*k,dt,true)} animate(g,dt,dist>.9?.9:.3);
   }
@@ -601,7 +683,7 @@ function update(dt){
       moveBody(g.position,B,d.x*mv,d.z*mv,dt,true);
       if(was&&!B.air&&B.sl){B.sl=false;shock(g.position)}
       B.slamCd-=dt; if(B.slamCd<=0&&!B.air&&dist<9){B.air=true;B.vy=10;B.sl=true;B.slamCd=9}   // salto con onda de choque
-      if(dist<1.9&&player.h<.5)corr+=9*dt;                                                    // mordida del jefe
+      if(dist<1.9&&player.h<.5){corr+=9*dt;if(biteCd<=0){sfx('bite');biteCd=.8}}                                                    // mordida del jefe
     }else moveBody(g.position,B,0,0,dt,false);
     animate(g,dt,B.air?1.5:(dist>1.6?.8:.3));
     B.flash=Math.max(0,B.flash-dt*2.5); B.mats.forEach(t=>t.emissive.setRGB(B.flash,B.flash*.15,B.flash));
@@ -630,7 +712,7 @@ function update(dt){
   if(gem.g.visible){
     gem.t-=dt;gem.g.rotation.y+=dt*3;gem.g.scale.setScalar(gem.t<1.5?1+.25*Math.sin(gem.t*18):1);   // palpita en el último 1.5 s
     gem.g.position.y=.3+Math.sin(performance.now()/250)*.15;
-    if(Math.hypot(gem.g.position.x-p.x,gem.g.position.z-p.z)<1){corr=Math.max(0,corr-CFG.gemHeal);ess=100;gem.g.visible=false;gem.wait=4}
+    if(Math.hypot(gem.g.position.x-p.x,gem.g.position.z-p.z)<1){corr=Math.max(0,corr-CFG.gemHeal);ess=100;gem.g.visible=false;gem.wait=4;sfx('gem')}
     else if(gem.t<=0){gem.g.visible=false;gem.wait=1.5}
   }else{gem.wait-=dt;if(gem.wait<=0)placeGem()}
 
@@ -658,7 +740,7 @@ function update(dt){
   if(corr>=100)end(false); else if(L.boss){ if(bossWin>0&&(bossWin-=dt)<=0)end(true) } else if(purified>=L.goal)end(true);
 }
 renderer.setAnimationLoop(()=>{
-  const dt=Math.min(clock.getDelta(),.05);
+  const dt=Math.min(clock.getDelta(),.05); musicTick(dt);
   if(state==='play')update(dt);
   else{const t=performance.now()/6000;cam.position.set(Math.sin(t)*14,8,Math.cos(t)*14);cam.lookAt(0,1,0)}
   sky.position.copy(cam.position);
